@@ -20,7 +20,6 @@ namespace CookingRecipeApp
             _uiManager.SetupLayout();
         }
 
-        #region Form Events
         private void Form1_Load(object sender, EventArgs e)
         {
             _dbManager.LoadRecipes(_uiManager.RecipeContainer, _recipePanelClickHandler, null);
@@ -28,9 +27,7 @@ namespace CookingRecipeApp
             ShowRecipeListView();
             _uiManager.UpdateLoginStatus(_userManager.IsLoggedIn, _userManager.CurrentUsername);
         }
-        #endregion
 
-        #region UI Event Handlers
         public void SearchTextBox_TextChanged(object sender, EventArgs e)
         {
             string keyword = _uiManager.SearchTextBox.Text.Trim();
@@ -79,24 +76,27 @@ namespace CookingRecipeApp
         {
             if (!_userManager.IsLoggedIn)
             {
-                MessageBox.Show("Vui lòng đăng nhập để sử dụng chức năng Shopping List.", "Yêu Cầu Đăng Nhập", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Please log in to use the Shopping List feature.", "Login Required", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 ShowLoginForm();
                 return;
             }
+            using (ShoppingListForm shoppingForm = new ShoppingListForm(_dbManager, _userManager.CurrentUserId))
+            {
+                shoppingForm.ShowDialog();
+            }
             HideRecipeListView();
-            // TODO: Thêm logic cho Shopping List
         }
 
         public void MealPlannerButton_Click(object sender, EventArgs e)
         {
             if (!_userManager.IsLoggedIn)
             {
-                MessageBox.Show("Vui lòng đăng nhập để sử dụng chức năng Meal Planner.", "Yêu Cầu Đăng Nhập", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Please log in to use the Meal Planner feature.", "Login Required", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 ShowLoginForm();
                 return;
             }
             HideRecipeListView();
-            // TODO: Thêm logic cho Meal Planner
+            // TODO: Add logic for Meal Planner
         }
 
         public void CookbooksButton_Click(object sender, EventArgs e)
@@ -108,15 +108,14 @@ namespace CookingRecipeApp
         {
             if (!_userManager.IsLoggedIn)
             {
-                MessageBox.Show("Vui lòng đăng nhập để thêm công thức.", "Yêu Cầu Đăng Nhập", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Please log in to add a recipe.", "Login Required", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 ShowLoginForm();
                 return;
             }
-            using (AddRecipeForm addForm = new AddRecipeForm(_dbManager))
+            using (AddRecipeForm addForm = new AddRecipeForm(_dbManager, null, _userManager.CurrentUserRole))
             {
                 if (addForm.ShowDialog() == DialogResult.OK)
                 {
-                    // Reload recipes sau khi thêm
                     string selectedMealType = _uiManager.SortComboBox.SelectedItem?.ToString();
                     _dbManager.LoadRecipes(_uiManager.RecipeContainer, _recipePanelClickHandler, selectedMealType);
                 }
@@ -140,9 +139,7 @@ namespace CookingRecipeApp
             _uiManager.UpdateLoginStatus(_userManager.IsLoggedIn, _userManager.CurrentUsername);
             ShowRecipeListView();
         }
-        #endregion
 
-        #region Search Logic
         public void PerformSearch()
         {
             string keyword = _uiManager.SearchTextBox.Text.Trim();
@@ -153,9 +150,7 @@ namespace CookingRecipeApp
                 _dbManager.SearchRecipes(keyword, _uiManager.RecipeContainer, _recipePanelClickHandler, selectedMealType);
             }
         }
-        #endregion
 
-        #region UI Control Methods
         private void ShowRecipeListView()
         {
             _uiManager.SortComboBox.Visible = true;
@@ -167,9 +162,7 @@ namespace CookingRecipeApp
             _uiManager.SortComboBox.Visible = false;
             _uiManager.RecipeContainer.Visible = false;
         }
-        #endregion
 
-        #region Recipe Panel Click Handler
         private void RecipePanel_Click(object sender, EventArgs e)
         {
             int recipeId = -1;
@@ -189,16 +182,14 @@ namespace CookingRecipeApp
 
             if (recipeId != -1)
             {
-                RecipeDetailForm detailForm = new RecipeDetailForm(recipeId);
+                RecipeDetailForm detailForm = new RecipeDetailForm(recipeId, _dbManager, _userManager.CurrentUserId, _userManager.IsLoggedIn, _userManager.CurrentUserRole);
                 detailForm.RecipeDeleted += (s, args) =>
                 {
-                    // Reload recipes sau khi xóa
                     string selectedMealType = _uiManager.SortComboBox.SelectedItem?.ToString();
                     _dbManager.LoadRecipes(_uiManager.RecipeContainer, _recipePanelClickHandler, selectedMealType);
                 };
                 detailForm.RecipeEdited += (s, args) =>
                 {
-                    // Reload recipes sau khi chỉnh sửa
                     string selectedMealType = _uiManager.SortComboBox.SelectedItem?.ToString();
                     _dbManager.LoadRecipes(_uiManager.RecipeContainer, _recipePanelClickHandler, selectedMealType);
                 };
@@ -206,9 +197,8 @@ namespace CookingRecipeApp
             }
             else
             {
-                MessageBox.Show("Không thể xác định ID công thức.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Cannot determine recipe ID.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-        #endregion
     }
 }
