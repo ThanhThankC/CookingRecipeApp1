@@ -116,24 +116,6 @@ namespace CookingRecipeApp
             };
             deleteButton.Click += DeleteButton_Click;
             this.Controls.Add(deleteButton);
-            //string projectPath = Application.StartupPath;
-            //string relativePath = Path.Combine("..", "..", "..", "Icons");
-            //string basePath = Path.GetFullPath(Path.Combine(projectPath, relativePath));
-
-            //PictureBox _deleteIcon = new PictureBox
-            //{
-            //    Size = new Size(20, 20),
-            //    Location = new Point(10, 8),
-            //    SizeMode = PictureBoxSizeMode.Zoom,
-            //    Cursor = Cursors.Hand
-            //};
-            //string deleteIconPath = Path.Combine(basePath, "icon3.png");
-            //if (File.Exists(deleteIconPath))
-            //{
-            //    _deleteIcon.Image = Image.FromFile(deleteIconPath);
-            //}
-            //_deleteIcon.Click += DeleteButton_Click;
-            //this.Controls.Add(_deleteIcon);
 
             // Tạo nút Edit
             Button editButton = new Button
@@ -228,4 +210,5 @@ namespace CookingRecipeApp
         }
         #endregion
     }
+
 }
