@@ -166,6 +166,7 @@ namespace CookingRecipeApp
                 _usernameTextBox.Text = "";
                 _passwordTextBox.Text = "";
                 _adminCheckBox.Checked = false;
+                
                 // Switch back to login mode
                 _loginButton.Visible = true;
                 _registerButton.Visible = false;
@@ -192,4 +193,5 @@ namespace CookingRecipeApp
             }
         }
     }
+
 }
