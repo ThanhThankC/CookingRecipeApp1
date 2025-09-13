@@ -14,9 +14,9 @@ namespace CookingRecipeApp
             {
                 Width = 220,  // COMMENT: Tăng width cho spacing tốt hơn
                 Height = 300,
-                Margin = new Padding(15),  // COMMENT: Tăng margin cho grid layout mượt mà
+                Margin = new Padding(15),  // COMMENT:
                 BorderStyle = BorderStyle.None,  // COMMENT: Flat design, no border
-                BackColor = Color.FromArgb(245, 245, 245),  // COMMENT: Light gray background cho modern look
+                BackColor = Color.FromArgb(245, 245, 245), 
                 Enabled = true,
                 Tag = recipeId,
                 Cursor = Cursors.Hand  // COMMENT: UX: Cursor hand để chỉ rõ clickable
