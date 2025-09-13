@@ -179,7 +179,7 @@ namespace CookingRecipeApp
                     }
                     reader.Close();
 
-                    // Tải danh sách nguyên liệu
+                    // Load list 
                     MySqlCommand ingredientsCommand = new MySqlCommand(
                         "SELECT name, quantity FROM ingredients WHERE recipe_id = @recipeId ORDER BY ingredient_id", connection);
                     ingredientsCommand.Parameters.AddWithValue("@recipeId", _recipeId);
@@ -212,3 +212,4 @@ namespace CookingRecipeApp
     }
 
 }
+
