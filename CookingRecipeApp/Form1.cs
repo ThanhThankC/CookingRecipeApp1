@@ -174,6 +174,7 @@ namespace CookingRecipeApp
             _uiManager.RecipeContainer.Visible = false;
         }
 
+    // Detail Form
         private void RecipePanel_Click(object sender, EventArgs e)
         {
             int recipeId = -1;
