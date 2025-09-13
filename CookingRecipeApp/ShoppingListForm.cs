@@ -22,6 +22,7 @@ namespace CookingRecipeApp
         /// <summary>
         /// Initializes the components of the shopping list form with modern styling.
         /// </summary>
+        
         private void InitializeComponents()
         {
             this.Text = "Shopping List";
@@ -84,4 +85,5 @@ namespace CookingRecipeApp
             }
         }
     }
+
 }
