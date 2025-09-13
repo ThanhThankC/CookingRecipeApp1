@@ -179,6 +179,7 @@ namespace CookingRecipeApp
             _suggestionsListBox.Click += SuggestionsListBox_Click;
             _leftPanel.Controls.Add(_suggestionsListBox);
 
+            
             // Login Button
             _loginButton = CreateMenuButton("Login", 160, _form.ShowLoginForm, Path.Combine(basePath, "loginIcon.png"));
             _loginButton.Visible = true;
