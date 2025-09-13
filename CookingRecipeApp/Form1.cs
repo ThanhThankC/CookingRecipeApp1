@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using System.Windows.Forms;
 
 namespace CookingRecipeApp
@@ -9,6 +10,7 @@ namespace CookingRecipeApp
         private readonly UIManager _uiManager;
         public readonly UserManager _userManager;
         public readonly EventHandler _recipePanelClickHandler;
+        private readonly ShoppingList _shoppingList;
 
         public Form1()
         {
@@ -17,6 +19,7 @@ namespace CookingRecipeApp
             _userManager = new UserManager();
             _uiManager = new UIManager(this);
             _recipePanelClickHandler = RecipePanel_Click;
+            _shoppingList = new ShoppingList();
             _uiManager.SetupLayout();
         }
 
@@ -74,16 +77,24 @@ namespace CookingRecipeApp
 
         public void ShoppingListButton_Click(object sender, EventArgs e)
         {
-            if (!_userManager.IsLoggedIn)
+            //if (!_userManager.IsLoggedIn)
+            //{
+            //    MessageBox.Show("Please log in to use the Shopping List feature.", "Login Required", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            //    ShowLoginForm(sender, e);
+            //    return;
+            //}
+            //using (ShoppingListForm shoppingForm = new ShoppingListForm(_dbManager, _userManager.CurrentUserId))
+            //{
+            //    shoppingForm.ShowDialog();
+            //}
+            Panel panel = new Panel
             {
-                MessageBox.Show("Please log in to use the Shopping List feature.", "Login Required", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                ShowLoginForm();
-                return;
-            }
-            using (ShoppingListForm shoppingForm = new ShoppingListForm(_dbManager, _userManager.CurrentUserId))
-            {
-                shoppingForm.ShowDialog();
-            }
+                Size = new Size(1100, 600),
+                Location = new Point(10, 10),
+                BackColor = Color.Black
+            };
+            this.Controls.Add(panel);
+            _shoppingList.InitializeComponent(this, _dbManager, _userManager.CurrentUserId);
             HideRecipeListView();
         }
 
@@ -92,7 +103,7 @@ namespace CookingRecipeApp
             if (!_userManager.IsLoggedIn)
             {
                 MessageBox.Show("Please log in to use the Meal Planner feature.", "Login Required", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                ShowLoginForm();
+                ShowLoginForm(sender, e);
                 return;
             }
             HideRecipeListView();
@@ -109,7 +120,7 @@ namespace CookingRecipeApp
             if (!_userManager.IsLoggedIn)
             {
                 MessageBox.Show("Please log in to add a recipe.", "Login Required", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                ShowLoginForm();
+                ShowLoginForm(sender, e);
                 return;
             }
             using (AddRecipeForm addForm = new AddRecipeForm(_dbManager, null, _userManager.CurrentUserRole))
@@ -122,7 +133,7 @@ namespace CookingRecipeApp
             }
         }
 
-        public void ShowLoginForm()
+        public void ShowLoginForm(object sender, EventArgs e)
         {
             using (LoginForm loginForm = new LoginForm(_userManager))
             {
@@ -133,7 +144,7 @@ namespace CookingRecipeApp
             }
         }
 
-        public void Logout()
+        public void Logout(object sender, EventArgs e)
         {
             _userManager.Logout();
             _uiManager.UpdateLoginStatus(_userManager.IsLoggedIn, _userManager.CurrentUsername);
