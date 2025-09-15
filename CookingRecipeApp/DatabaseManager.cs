@@ -463,7 +463,10 @@ namespace CookingRecipeApp
             }
         }
 
-        public List<(string name, string quantity, bool completed)> LoadShoppingList(int userId)
+        /// <summary>
+        /// Loads shopping list from shopping_lists table.
+        /// </summary>
+        public List<(string name, string quantity, bool purchased)> LoadShoppingList(int userId)
         {
             List<(string, string, bool)> items = new List<(string, string, bool)>();
             try
@@ -471,13 +474,7 @@ namespace CookingRecipeApp
                 using (MySqlConnection connection = new MySqlConnection(_connectionString))
                 {
                     connection.Open();
-                    string query = @"
-                        SELECT DISTINCT i.name, i.quantity, COALESCE(s.is_purchased, 0) as completed
-                        FROM ingredients i
-                        INNER JOIN recipes r ON i.recipe_id = r.recipe_id
-                        INNER JOIN ratings f ON r.recipe_id = f.recipe_id
-                        LEFT JOIN shopping_lists s ON i.name = s.ingredient_name AND f.user_id = s.user_id
-                        WHERE f.user_id = @userId AND f.is_favorite = TRUE AND r.is_active = TRUE";
+                    string query = "SELECT ingredient_name AS name, quantity, is_purchased AS purchased FROM shopping_lists WHERE user_id = @userId";
                     MySqlCommand command = new MySqlCommand(query, connection);
                     command.Parameters.AddWithValue("@userId", userId);
                     MySqlDataReader reader = command.ExecuteReader();
@@ -485,8 +482,8 @@ namespace CookingRecipeApp
                     {
                         string name = reader["name"].ToString();
                         string quantity = reader["quantity"].ToString();
-                        bool completed = Convert.ToBoolean(reader["completed"]);
-                        items.Add((name, quantity, completed));
+                        bool purchased = reader.GetBoolean("purchased");
+                        items.Add((name, quantity, purchased));
                     }
                 }
             }
@@ -497,39 +494,54 @@ namespace CookingRecipeApp
             return items;
         }
 
-        public void UpdateShoppingItem(int userId, string ingredientName, bool completed)
+        /// <summary>
+        /// Adds a shopping item if not exists (or update if exists).
+        /// </summary>
+        public void AddShoppingItem(int userId, string name, string quantity)
         {
             try
             {
                 using (MySqlConnection connection = new MySqlConnection(_connectionString))
                 {
                     connection.Open();
-                    using (MySqlTransaction transaction = connection.BeginTransaction())
+                    string query = "INSERT INTO shopping_lists (user_id, ingredient_name, quantity, is_purchased) VALUES (@userId, @name, @quantity, FALSE) " +
+                                   "ON DUPLICATE KEY UPDATE quantity = @quantity, is_purchased = FALSE";
+                    MySqlCommand command = new MySqlCommand(query, connection);
+                    command.Parameters.AddWithValue("@userId", userId);
+                    command.Parameters.AddWithValue("@name", name);
+                    command.Parameters.AddWithValue("@quantity", quantity);
+                    command.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error adding shopping item: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Updates shopping item details (name, quantity, purchased status).
+        /// </summary>
+        public void UpdateShoppingItemDetails(int userId, string oldName, string newName, string quantity, bool purchased)
+        {
+            try
+            {
+                using (MySqlConnection connection = new MySqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    string query = "UPDATE shopping_lists SET ingredient_name = @newName, quantity = @quantity, is_purchased = @purchased " +
+                                   "WHERE user_id = @userId AND ingredient_name = @oldName";
+                    MySqlCommand command = new MySqlCommand(query, connection);
+                    command.Parameters.AddWithValue("@userId", userId);
+                    command.Parameters.AddWithValue("@oldName", oldName);
+                    command.Parameters.AddWithValue("@newName", newName);
+                    command.Parameters.AddWithValue("@quantity", quantity);
+                    command.Parameters.AddWithValue("@purchased", purchased);
+                    int rowsAffected = command.ExecuteNonQuery();
+                    if (rowsAffected == 0)
                     {
-                        try
-                        {
-                            string deleteQuery = "DELETE FROM shopping_lists WHERE user_id = @userId AND ingredient_name = @ingredientName";
-                            MySqlCommand deleteCmd = new MySqlCommand(deleteQuery, connection, transaction);
-                            deleteCmd.Parameters.AddWithValue("@userId", userId);
-                            deleteCmd.Parameters.AddWithValue("@ingredientName", ingredientName);
-                            deleteCmd.ExecuteNonQuery();
-
-                            if (completed)
-                            {
-                                string insertQuery = "INSERT INTO shopping_lists (user_id, ingredient_name, is_purchased) VALUES (@userId, @ingredientName, 1)";
-                                MySqlCommand insertCmd = new MySqlCommand(insertQuery, connection, transaction);
-                                insertCmd.Parameters.AddWithValue("@userId", userId);
-                                insertCmd.Parameters.AddWithValue("@ingredientName", ingredientName);
-                                insertCmd.ExecuteNonQuery();
-                            }
-
-                            transaction.Commit();
-                        }
-                        catch
-                        {
-                            transaction.Rollback();
-                            throw;
-                        }
+                        // If name changed and no row updated, perhaps insert as new
+                        AddShoppingItem(userId, newName, quantity);
                     }
                 }
             }
@@ -537,6 +549,385 @@ namespace CookingRecipeApp
             {
                 MessageBox.Show($"Error updating shopping item: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        /// <summary>
+        /// Deletes a shopping item.
+        /// </summary>
+        public void DeleteShoppingItem(int userId, string name)
+        {
+            try
+            {
+                using (MySqlConnection connection = new MySqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    string query = "DELETE FROM shopping_lists WHERE user_id = @userId AND ingredient_name = @name";
+                    MySqlCommand command = new MySqlCommand(query, connection);
+                    command.Parameters.AddWithValue("@userId", userId);
+                    command.Parameters.AddWithValue("@name", name);
+                    command.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error deleting shopping item: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Adds ingredients from favorited recipes to shopping list.
+        /// </summary>
+        public void AddIngredientsFromFavorites(int userId)
+        {
+            try
+            {
+                using (MySqlConnection connection = new MySqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    string query = @"
+                        INSERT IGNORE INTO shopping_lists (user_id, ingredient_name, quantity, is_purchased)
+                        SELECT @userId, i.name, i.quantity, FALSE
+                        FROM ingredients i
+                        INNER JOIN recipes r ON i.recipe_id = r.recipe_id
+                        INNER JOIN ratings f ON r.recipe_id = f.recipe_id
+                        WHERE f.user_id = @userId AND f.is_favorite = TRUE AND r.is_active = TRUE";
+                    MySqlCommand command = new MySqlCommand(query, connection);
+                    command.Parameters.AddWithValue("@userId", userId);
+                    command.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error adding ingredients from favorites: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        // Thêm những methods này vào class DatabaseManager
+
+        /// <summary>
+        /// Adds or updates a recipe in the recently viewed list for a user
+        /// Uses INSERT ... ON DUPLICATE KEY UPDATE to handle unique constraint
+        /// </summary>
+        /// <param name="recipeId">ID of the recipe</param>
+        /// <param name="userId">ID of the user</param>
+        public void AddToRecentlyViewed(int recipeId, int userId)
+        {
+            if (userId <= 0 || recipeId <= 0) return;
+
+            try
+            {
+                using (MySqlConnection connection = new MySqlConnection(_connectionString))
+                {
+                    connection.Open();
+
+                    // Use INSERT ... ON DUPLICATE KEY UPDATE to handle the unique constraint
+                    // This will insert if not exists, or update the viewed_at timestamp if exists
+                    string query = @"
+                INSERT INTO recently_viewed (user_id, recipe_id, viewed_at) 
+                VALUES (@userId, @recipeId, NOW())
+                ON DUPLICATE KEY UPDATE viewed_at = NOW()";
+
+                    using (MySqlCommand command = new MySqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@userId", userId);
+                        command.Parameters.AddWithValue("@recipeId", recipeId);
+                        command.ExecuteNonQuery();
+                    }
+
+                    // Keep only the latest 10 records for this user to prevent table bloat
+                    CleanupRecentlyViewed(userId, connection);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log error but don't show to user as this is background functionality
+                System.Diagnostics.Debug.WriteLine($"Error adding to recently viewed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Removes old entries from recently_viewed table, keeping only the latest 10 for each user
+        /// </summary>
+        /// <param name="userId">ID of the user</param>
+        /// <param name="connection">Active database connection</param>
+        private void CleanupRecentlyViewed(int userId, MySqlConnection connection)
+        {
+            try
+            {
+                string cleanupQuery = @"
+            DELETE FROM recently_viewed 
+            WHERE user_id = @userId 
+            AND id NOT IN (
+                SELECT id FROM (
+                    SELECT id FROM recently_viewed 
+                    WHERE user_id = @userId 
+                    ORDER BY viewed_at DESC 
+                    LIMIT 10
+                ) AS recent_subset
+            )";
+
+                using (MySqlCommand command = new MySqlCommand(cleanupQuery, connection))
+                {
+                    command.Parameters.AddWithValue("@userId", userId);
+                    command.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error cleaning up recently viewed: {ex.Message}");
+            }
+        }
+
+
+        // Add these methods to your DatabaseManager.cs class
+
+        /// <summary>
+        /// Gets a specific meal plan by ID for editing purposes.
+        /// </summary>
+        /// <param name="mealPlanId">ID of the meal plan</param>
+        /// <returns>DataTable containing meal plan details</returns>
+        public DataTable GetMealPlanById(int mealPlanId)
+        {
+            DataTable dataTable = new DataTable();
+            try
+            {
+                using (MySqlConnection connection = new MySqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    string query = @"
+                SELECT mp.plan_id, mp.user_id, mp.recipe_id, mp.plan_date, 
+                       mp.meal_type, mp.custom_meal_name, r.title AS recipe_title
+                FROM plans mp
+                LEFT JOIN recipes r ON mp.recipe_id = r.recipe_id
+                WHERE mp.plan_id = @mealPlanId";
+
+                    using (MySqlCommand command = new MySqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@mealPlanId", mealPlanId);
+                        using (MySqlDataAdapter adapter = new MySqlDataAdapter(command))
+                        {
+                            adapter.Fill(dataTable);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error retrieving meal plan: {ex.Message}",
+                    "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            return dataTable;
+        }
+
+        public void UpdateMealPlan(int mealPlanId, int? recipeId, string customMealName, string notes)
+        {
+            try
+            {
+                using (MySqlConnection connection = new MySqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    string query = @"
+                UPDATE meal_plans 
+                SET recipe_id = @recipeId, custom_meal_name = @customMealName, notes = @notes, updated_at = NOW()
+                WHERE plan_id = @mealPlanId";
+
+                    using (MySqlCommand command = new MySqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@mealPlanId", mealPlanId);
+                        command.Parameters.AddWithValue("@recipeId", (object)recipeId ?? DBNull.Value);
+                        command.Parameters.AddWithValue("@customMealName", (object)customMealName ?? DBNull.Value);
+                        command.Parameters.AddWithValue("@notes", (object)notes ?? DBNull.Value);
+
+                        int rowsAffected = command.ExecuteNonQuery();
+                        if (rowsAffected == 0)
+                        {
+                            throw new Exception("Meal plan not found or could not be updated.");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error updating meal plan: {ex.Message}",
+                    "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        public void DeleteMealPlan(int mealPlanId)
+        {
+            try
+            {
+                using (MySqlConnection connection = new MySqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    string query = "DELETE FROM meal_plans WHERE plan_id = @mealPlanId";
+
+                    using (MySqlCommand command = new MySqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@mealPlanId", mealPlanId);
+
+                        int rowsAffected = command.ExecuteNonQuery();
+                        if (rowsAffected == 0)
+                        {
+                            throw new Exception("Meal plan not found or could not be deleted.");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error deleting meal plan: {ex.Message}",
+                    "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        public DataTable GetMealPlanForWeek(int userId, DateTime weekStart)
+        {
+            DataTable dataTable = new DataTable();
+            try
+            {
+                using (MySqlConnection connection = new MySqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    string query = @"
+                SELECT mp.plan_id, mp.plan_date, mp.meal_type, 
+                       r.title AS recipe_title, mp.custom_meal_name
+                FROM meal_plans mp
+                LEFT JOIN recipes r ON mp.recipe_id = r.recipe_id
+                WHERE mp.user_id = @userId 
+                AND mp.plan_date BETWEEN @weekStart AND @weekEnd
+                AND (r.is_active = TRUE OR r.recipe_id IS NULL)";
+
+                    using (MySqlCommand command = new MySqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@userId", userId);
+                        command.Parameters.AddWithValue("@weekStart", weekStart.Date);
+                        command.Parameters.AddWithValue("@weekEnd", weekStart.Date.AddDays(6));
+
+                        using (MySqlDataAdapter adapter = new MySqlDataAdapter(command))
+                        {
+                            adapter.Fill(dataTable);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error retrieving meal plan: {ex.Message}",
+                    "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            return dataTable;
+        }
+
+        public void AddMealPlan(int userId, int? recipeId, DateTime plannedDate, string mealType, string customMealName, string notes)
+        {
+            try
+            {
+                using (MySqlConnection connection = new MySqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    string query = @"
+                INSERT INTO meal_plans (user_id, recipe_id, plan_date, meal_type, custom_meal_name, notes)
+                VALUES (@userId, @recipeId, @plannedDate, @mealType, @customMealName, @notes)";
+
+                    using (MySqlCommand command = new MySqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@userId", userId);
+                        command.Parameters.AddWithValue("@recipeId", (object)recipeId ?? DBNull.Value);
+                        command.Parameters.AddWithValue("@plannedDate", plannedDate.Date);
+                        command.Parameters.AddWithValue("@mealType", mealType);
+                        command.Parameters.AddWithValue("@customMealName", (object)customMealName ?? DBNull.Value);
+                        command.Parameters.AddWithValue("@notes", (object)notes ?? DBNull.Value);
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error adding meal plan: {ex.Message}",
+                    "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        public DataTable GetAllActiveRecipes()
+        {
+            DataTable dataTable = new DataTable();
+            try
+            {
+                using (MySqlConnection connection = new MySqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    string query = "SELECT recipe_id, title FROM recipes WHERE is_active = TRUE";
+
+                    using (MySqlCommand command = new MySqlCommand(query, connection))
+                    {
+                        using (MySqlDataAdapter adapter = new MySqlDataAdapter(command))
+                        {
+                            adapter.Fill(dataTable);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error retrieving active recipes: {ex.Message}",
+                    "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            return dataTable;
+        }
+
+        public DataTable GetAllRecipes()
+        {
+            DataTable dataTable = new DataTable();
+            try
+            {
+                using (MySqlConnection connection = new MySqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    string query = "SELECT recipe_id, title FROM recipes";
+
+                    using (MySqlCommand command = new MySqlCommand(query, connection))
+                    {
+                        using (MySqlDataAdapter adapter = new MySqlDataAdapter(command))
+                        {
+                            adapter.Fill(dataTable);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error retrieving all recipes: {ex.Message}",
+                    "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            return dataTable;
+        }
+
+        public DataTable SearchActiveRecipes(string keyword)
+        {
+            DataTable dataTable = new DataTable();
+            try
+            {
+                using (MySqlConnection connection = new MySqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    string query = "SELECT recipe_id, title FROM recipes WHERE title LIKE @keyword AND is_active = TRUE";
+
+                    using (MySqlCommand command = new MySqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@keyword", "%" + keyword + "%");
+                        using (MySqlDataAdapter adapter = new MySqlDataAdapter(command))
+                        {
+                            adapter.Fill(dataTable);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error searching recipes: {ex.Message}",
+                    "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            return dataTable;
         }
     }
 }
