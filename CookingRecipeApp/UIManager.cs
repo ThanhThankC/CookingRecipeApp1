@@ -101,7 +101,6 @@ namespace CookingRecipeApp
                 Cursor = Cursors.Hand
             };
 
-            // Load icon from file
             string projectPath = Application.StartupPath;
             string relativePath = Path.Combine("..", "..", "..", "Icons");
             string basePath = Path.GetFullPath(Path.Combine(projectPath, relativePath));
