@@ -40,6 +40,7 @@ namespace CookingRecipeApp
 
         private void InitializeComponents()
         {
+
             // Remove existing panel if it exists
             if (_mainPanel != null)
             {
@@ -56,6 +57,8 @@ namespace CookingRecipeApp
                 BorderStyle = BorderStyle.None,
                 Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right
             };
+
+            
 
             // Add subtle shadow effect
             _mainPanel.Paint += MainPanel_Paint;
@@ -94,7 +97,6 @@ namespace CookingRecipeApp
             // Title with icon
             _titleLabel = new Label
             {
-                Text = "📚 Recently Viewed",
                 Location = new Point(15, 18),
                 Size = new Size(190, 24),
                 Font = new Font("Segoe UI", 11, FontStyle.Bold),
@@ -102,6 +104,14 @@ namespace CookingRecipeApp
                 BackColor = Color.Transparent,
                 TextAlign = ContentAlignment.MiddleLeft
             };
+            if (!AppState.IsEnglish)
+            {
+                _titleLabel.Text = "📚 Xem gần đây";
+            }
+            else
+            {
+                _titleLabel.Text = "📚 Recently Viewed";
+            }
             _headerPanel.Controls.Add(_titleLabel);
 
             // Separator line
@@ -131,6 +141,8 @@ namespace CookingRecipeApp
             _recentContainer.AutoScrollMargin = new Size(0, 10);
 
             _mainPanel.Controls.Add(_recentContainer);
+
+            UpdateTheme(); // Apply theme colors
         }
 
         private void LoadRecentlyViewed()
@@ -180,7 +192,11 @@ namespace CookingRecipeApp
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading recently viewed recipes: {ex.Message}",
+                if (!AppState.IsEnglish)
+                    MessageBox.Show($"Lỗi khi tải công thức đã xem gần đây: {ex.Message}",
+                    "Lỗi Cơ Sở Dữ Liệu", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                else
+                    MessageBox.Show($"Error loading recently viewed recipes: {ex.Message}",
                     "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -206,7 +222,6 @@ namespace CookingRecipeApp
 
             Label emptyLabel = new Label
             {
-                Text = "No recent recipes",
                 Size = new Size(200, 20),
                 TextAlign = ContentAlignment.MiddleCenter,
                 ForeColor = Color.Gray,
@@ -214,10 +229,16 @@ namespace CookingRecipeApp
                 BackColor = Color.Transparent,
                 Location = new Point(0, 65)
             };
+            if (!AppState.IsEnglish)
+            {
+                emptyLabel.Text = "Chưa có công thức gần đây";
+            }
+            else
+                emptyIcon.Text = "No recent recipes";
+
 
             Label emptySubLabel = new Label
             {
-                Text = "Start exploring recipes!",
                 Size = new Size(200, 16),
                 TextAlign = ContentAlignment.MiddleCenter,
                 ForeColor = Color.LightGray,
@@ -225,6 +246,12 @@ namespace CookingRecipeApp
                 BackColor = Color.Transparent,
                 Location = new Point(0, 85)
             };
+            if (!AppState.IsEnglish)
+            {
+                emptySubLabel.Text = "Bắt đầu khám phá công thức!";
+            }
+            else
+                emptySubLabel.Text = "Start exploring recipes!";
 
             emptyPanel.Controls.AddRange(new Control[] { emptyIcon, emptyLabel, emptySubLabel });
             _recentContainer.Controls.Add(emptyPanel);
@@ -401,6 +428,14 @@ namespace CookingRecipeApp
             {
                 SetDefaultImage(recipeImage);
             }
+            if (!AppState.IsEnglish)
+            {
+                _titleLabel.Text = "📚 Xem gần đây";
+            }
+            else
+            {
+                _titleLabel.Text = "📚 Recently Viewed";
+            }
         }
 
         private void SetDefaultImage(PictureBox recipeImage)
@@ -432,6 +467,20 @@ namespace CookingRecipeApp
         {
             TimeSpan timeDiff = DateTime.Now - viewedAt;
 
+            if (!AppState.IsEnglish)
+                {
+                if (timeDiff.TotalMinutes < 1)
+                    return "Vừa xong";
+                else if (timeDiff.TotalMinutes < 60)
+                    return $"{(int)timeDiff.TotalMinutes} phút trước";
+                else if (timeDiff.TotalHours < 24)
+                    return $"{(int)timeDiff.TotalHours} giờ trước";
+                else if (timeDiff.TotalDays < 7)
+                    return $"{(int)timeDiff.TotalDays} ngày trước";
+                else
+                    return viewedAt.ToString("dd MMM");
+            }
+            else 
             if (timeDiff.TotalMinutes < 1)
                 return "Just now";
             else if (timeDiff.TotalMinutes < 60)
@@ -510,6 +559,38 @@ namespace CookingRecipeApp
             LoadRecentlyViewed();
         }
 
+        public void UpdateTheme()
+        {
+            if (_mainPanel == null) return;
+            if (AppState.isDarkMode)
+            {
+                _mainPanel.BackColor = Color.Black;
+                _headerPanel.BackColor = Color.Gray;
+                _titleLabel.ForeColor = Color.White;
+            }
+            else
+            {
+                _mainPanel.BackColor = Color.LightYellow;
+                _headerPanel.BackColor = Color.Orange;
+                _titleLabel.ForeColor = Color.FromArgb(33, 37, 41);
+            }
+            // Update child panels
+            foreach (Control ctrl in _recentContainer.Controls)
+            {
+                if (ctrl is Panel panel)
+                {
+                    panel.Invalidate(); // Trigger repaint for rounded corners
+                    foreach (Control child in panel.Controls)
+                    {
+                        if (child is Label label)
+                        {
+                            label.ForeColor = AppState.isDarkMode ? Color.White : Color.FromArgb(33, 37, 41);
+                        }
+                    }
+                }
+            }
+        }
+
         // Method to clear recent viewed history
         public void ClearRecentHistory()
         {
@@ -533,7 +614,11 @@ namespace CookingRecipeApp
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error clearing recent history: {ex.Message}",
+                if (!AppState.IsEnglish)
+                    MessageBox.Show($"Lỗi khi xóa lịch sử xem gần đây: {ex.Message}",
+                    "Lỗi Cơ Sở Dữ Liệu", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                else
+                    MessageBox.Show($"Error clearing recent history: {ex.Message}",
                     "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
