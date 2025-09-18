@@ -15,6 +15,7 @@ namespace CookingRecipeApp
         private readonly MealPlanner _mealPlanner;
         private readonly RecentViewed _recentViewed;
 
+
         public bool isEnglish = true;
 
         public Form1()
