@@ -142,7 +142,7 @@ namespace CookingRecipeApp
 
             _mainPanel.Controls.Add(_recentContainer);
 
-            UpdateTheme(); // Apply theme colors
+            UpdateTheme(); 
         }
 
         private void LoadRecentlyViewed()
@@ -659,4 +659,5 @@ namespace CookingRecipeApp
             _headerPanel.Controls.Add(clearButton);
         }
     }
+
 }
